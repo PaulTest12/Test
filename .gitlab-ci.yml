@@ -1,0 +1,7 @@
+stages:
+ - test
+
+echo-job:
+ stage: test
+ script:
+  -echo "hello from CI"
