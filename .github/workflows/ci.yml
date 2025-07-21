@@ -1,0 +1,11 @@
+name: CI workflow
+
+on: [push]
+
+jobs:
+ test:
+   name: hello_job
+   runs-on: ubuntu-lates
+   steps:
+     - name: Run script
+     run: echo "Hello from CI"
