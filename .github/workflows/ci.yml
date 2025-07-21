@@ -1,11 +1,11 @@
-name: CI workflow
+name: CI
 
 on: [push]
 
 jobs:
- test:
-   name: hello_job
-   runs-on: ubuntu-lates
-   steps:
-     - name: Run script
-     run: echo "Hello from CI"
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Say Hello
+        run: echo "Hello from CI"
