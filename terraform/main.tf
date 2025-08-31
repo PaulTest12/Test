@@ -1,20 +1,38 @@
-.PHONY: all init up provision destroy clean down
+terraform {
+  required_providers {
+    docker = {
+      source  = "kreuzwerker/docker"
+      version = "~> 3.6"
+    }
+  }
+}
 
-all: up provision
+provider "docker" {}
 
-init:
-	cd terraform && terraform init
+resource "docker_image" "sshd" {
+  name = "rastasheep/ubuntu-sshd:latest"
+}
 
-up: init
-	cd terraform && terraform apply -auto-approve
+resource "docker_container" "vm" {
+  name  = "vm1"
+  image = docker_image.sshd.name
 
-provision:
-	ansible-playbook -i ansible/hosts ansible/site.yml
+  ports {
+    internal = 22
+    external = 2222
+  }
 
-destroy:
-	cd terraform && terraform destroy -auto-approve
+  ports {
+    internal = 80
+    external = 8080
+  }
+}
 
-clean:
-	rm -f ansible/hosts
+resource "local_file" "ansible_inventory" {
+  content = templatefile("${path.module}/inventory.tpl", {
+    ip   = "127.0.0.1"
+    port = 2222
+  })
 
-down: destroy clean
+  filename = "${path.module}/../ansible/hosts"
+}
