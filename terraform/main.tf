@@ -1,46 +1,47 @@
-terraform {
-  required_providers {
-    docker = {
-      source  = "kreuzwerker/docker"
-      version = "~> 3.0"
-    }
-    local = {
-      source  = "hashicorp/local"
-      version = "~> 2.2"
-    }
-  }
-}
+[targets]
+127.0.0.1 ansible_port=${ssh_port} ansible_user=root ansible_password=root ansible_connection=ssh ansible_ssh_common_args='-o StrictHostKeyChecking=no' ansible_python_interpreter=/usr/bin/python3
 
-provider "docker" {}
-provider "local" {}
 
-# Obraz z działającym SSH
-resource "docker_image" "sshd" {
-  name = "rastasheep/ubuntu-sshd:18.04"
-}
+---
+- name: Konfiguracja serwera WWW
+  hosts: targets
+  become: true
+  gather_facts: true
 
-# Kontener "VM"
-resource "docker_container" "vm" {
-  name  = "ansible_target"
-  image = docker_image.sshd.latest
+  vars:
+    html_file: /var/www/html/index.html
 
-  # SSH: 22 -> 2222
-  ports {
-    internal = 22
-    external = 2222
-  }
+  tasks:
+    - name: Aktualizacja cache apt
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
 
-  # HTTP: 80 -> 8080
-  ports {
-    internal = 80
-    external = 8080
-  }
-}
+    - name: Instalacja nginx
+      apt:
+        name: nginx
+        state: present
+      notify: Restart nginx
 
-# Inventory dla Ansible
-resource "local_file" "inventory" {
-  content = templatefile("${path.module}/inventory.tpl", {
-    ssh_port = docker_container.vm.ports[0].external
-  })
-  filename = "${path.module}/../ansible/hosts"
-}
+    - name: Utworzenie strony index.html
+      copy:
+        dest: "{{ html_file }}"
+        content: |
+          <html>
+          <body>
+          <h1>Serwer z Ansible 🚀</h1>
+          <p>Data: {{ ansible_date_time.date }} {{ ansible_date_time.time }}</p>
+          </body>
+          </html>
+      notify: Restart nginx
+
+  handlers:
+    - name: Restart nginx
+      shell: |
+        if pgrep nginx; then
+          nginx -s reload
+        else
+          nginx
+        fi
+      args:
+        warn: false
