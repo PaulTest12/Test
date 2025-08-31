@@ -1,18 +1,40 @@
-.PHONY: all init up provision destroy clean
+terraform {
+  required_providers {
+    docker = {
+      source  = "kreuzwerker/docker"
+      version = "~> 3.0.2"
+    }
+  }
+}
 
-all: up provision
+provider "docker" {}
 
-init:
-	cd terraform && terraform init
+# 1. Pobranie obrazu z Docker Hub
+resource "docker_image" "sshd" {
+  name = "rastasheep/ubuntu-sshd:latest"
+}
 
-up: init
-	cd terraform && terraform apply -auto-approve
+# 2. Tworzymy kontener (VM)
+resource "docker_container" "vm" {
+  name  = "vm1"
+  image = docker_image.sshd.name   # Używamy .name, NIE .latest
 
-provision:
-	ansible-playbook -i ansible/hosts ansible/site.yml
+  ports {
+    internal = 22   # SSH wewnątrz kontenera
+    external = 2222 # Na hoście łączysz się po 2222
+  }
+}
 
-destroy:
-	cd terraform && terraform destroy -auto-approve
+# 3. Generujemy inventory dla Ansible
+resource "local_file" "ansible_inventory" {
+  content = templatefile("${path.module}/inventory.tpl", {
+    ip = "127.0.0.1"
+    port = 2222
+  })
 
-clean:
-	rm -f ansible/hosts
+  filename = "${path.module}/../ansible/hosts"
+}
+
+[web]
+vm1 ansible_host=${ip} ansible_port=${port} ansible_user=root ansible_ssh_pass=root
+
